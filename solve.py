@@ -45,7 +45,7 @@ def solve(runtime_options=None):
     gws = list(range(next_gw, next_gw + horizon))
     all_gws = [next_gw - 1] + gws
 
-    df = pd.read_csv("xpts.csv", index_col="ID")
+    df = pd.read_csv("xpts.csv", index_col="ID", encoding="latin-1")
     if options.get("randomised", False):
         rng = np.random.default_rng(seed=options.get("seed"))
         for w in gws:
