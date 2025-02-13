@@ -1,7 +1,7 @@
 {
     "decay": 0.85,
     "horizon": 6,
-    "solver": "gurobi",
+    "solver": "highs",
     "solver_path": "",
     "preseason": true,
     "use_wc": 0,
