@@ -20,5 +20,5 @@ Mostly the same as the FPL solver. To clarify the differences:
 
 The aim of the sensitivity analysis is to randomise the xpts for all players based on their xmins and then solve with these new xpts. This is repeated many times and then you can find the transfers that come out as optimal most often. To do this,
 -  ensure that the `results/` folder is empty of any solve solutions
-- run `python simulations.py --no 50 --parallel 6` where 50 is the total number of simulations you want to run, and 6 is the number of solves to run in parallel. If not supplying a value for --parallel, it will use a value based on the number of CPU processes
-- when this has finished, run `python sensitivity.py` and answer the questions, or run e.g. `python sensitivity.py --all_gws n --gw 5 --wildcard n. You can run `python sensitivity.py --help` for help with the optional command line arguments.
+- run `python simulations.py --no 50 --parallel 6` where 50 is the total number of simulations you want to run, and 6 is the number of solves to run in parallel. If not supplying a value for --parallel, it will use a value based on the number of CPU processes available
+- when this has finished, run `python sensitivity.py` and answer the questions, or run e.g. `python sensitivity.py --all_gws n --gw 5 --wildcard n`. You can run `python sensitivity.py --help` for help with the optional command line arguments.
