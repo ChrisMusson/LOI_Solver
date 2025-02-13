@@ -1,0 +1,14 @@
+{
+    "decay": 0.85,
+    "horizon": 6,
+    "solver": "gurobi",
+    "solver_path": "",
+    "preseason": true,
+    "use_wc": 0,
+    "use_tc": 0,
+    "locked": [],
+    "banned": [],
+    "iterations": 1,
+    "randomised": false,
+    "gap": 0
+}
