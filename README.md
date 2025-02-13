@@ -4,6 +4,7 @@ A modifed version of the FPL Solver found here: https://github.com/sertalpbilal/
 
 # Instructions
 - `git clone https://github.com/ChrisMusson/LOI_Solver.git LOI & cd LOI`
+- `pip install -r requirements.txt`
 - edit settings in `settings.json`, most importantly the path to your `highs.exe` executable
 - replace the file `xpts.csv` with an updated xpts CSV
 - `python solve.py`
