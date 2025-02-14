@@ -180,7 +180,7 @@ def solve(runtime_options=None):
             if isinstance(x, int):
                 model.add_constraints((squad[x, w] == 1 for w in gws), name=f"locked_{x}")
             elif isinstance(x, list):
-                model.add_constraint((squad[p0, p1] == 1 for (p0, p1) in x), name=f"locked_{x}_{gw}")
+                model.add_constraint(squad[x[0], x[1]] == 1, name=f"locked_{x[0]}_{x[1]}")
 
     if options.get("banned"):
         print("OC - Banned")
@@ -188,7 +188,7 @@ def solve(runtime_options=None):
             if isinstance(x, int):
                 model.add_constraints((squad[x, w] == 0 for w in gws), name=f"banned_{x}")
             elif isinstance(x, list):
-                model.add_constraint((squad[p0, p1] == 0 for (p0, p1) in x), name=f"banned_{x}_{gw}")
+                model.add_constraint(squad[x[0], x[w]] == 0, name=f"banned_{x[0]}_{x[1]}")
 
     # Objective
     pts_player_week = {(p, w): df.loc[p, f"{w}_Pts"] for p in players for w in gws}
