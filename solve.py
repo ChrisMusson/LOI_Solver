@@ -97,7 +97,7 @@ def solve(runtime_options=None):
     type_data = {
         "G": {"squad": 2, "min": 1, "max": 1},
         "D": {"squad": 5, "min": 3, "max": 5},
-        "M": {"squad": 5, "min": 2, "max": 5},
+        "M": {"squad": 5, "min": 3, "max": 5},
         "F": {"squad": 3, "min": 1, "max": 3},
     }
 
