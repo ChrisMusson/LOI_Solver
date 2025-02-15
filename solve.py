@@ -547,14 +547,16 @@ def solve(runtime_options=None):
         )
 
         # at least 1 different transfer in/out for the next gw
+        target_gw = options.get("target_gw", next_gw)
         actions = (
-            so.expr_sum(1 - t_in[p, next_gw] for p in players if t_in[p, next_gw].get_value() > 0.5)
-            + so.expr_sum(t_in[p, next_gw] for p in players if t_in[p, next_gw].get_value() < 0.5)
-            + so.expr_sum(1 - t_out[p, next_gw] for p in players if t_out[p, next_gw].get_value() > 0.5)
-            + so.expr_sum(t_out[p, next_gw] for p in players if t_out[p, next_gw].get_value() < 0.5)
+            so.expr_sum(1 - t_in[p, target_gw] for p in players if t_in[p, target_gw].get_value() > 0.5)
+            + so.expr_sum(t_in[p, target_gw] for p in players if t_in[p, target_gw].get_value() < 0.5)
+            + so.expr_sum(1 - t_out[p, target_gw] for p in players if t_out[p, target_gw].get_value() > 0.5)
+            + so.expr_sum(t_out[p, target_gw] for p in players if t_out[p, target_gw].get_value() < 0.5)
         )
         model.add_constraint(actions >= 1, name=f"cutoff_{it}")
 
+    # write solutions to csv
     for result in solutions:
         it = result["iter"]
         print(result["summary"])
