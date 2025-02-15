@@ -42,6 +42,7 @@ def solve(runtime_options=None):
     # preseason hard coded value TODO: FIX
     if preseason:
         next_gw = 1
+    target_gw = options.get("target_gw", next_gw)
     gws = list(range(next_gw, next_gw + horizon))
     all_gws = [next_gw - 1] + gws
 
@@ -474,13 +475,13 @@ def solve(runtime_options=None):
             for p in players:
                 if t_in[p, w].get_value() > 0.5:
                     summary_of_actions += f"Buy {p} - {df['Name'][p]}\n"
-                    if w == next_gw:
+                    if w == target_gw:
                         move_summary["buy"].append(df["Name"][p])
 
             for p in players:
                 if t_out[p, w].get_value() > 0.5:
                     summary_of_actions += f"Sell {p} - {df['Name'][p]}\n"
-                    if w == next_gw:
+                    if w == target_gw:
                         move_summary["sell"].append(df["Name"][p])
 
             gw_df = picks_df[picks_df["week"] == w]
