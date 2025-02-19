@@ -10,9 +10,35 @@ import time
 
 import numpy as np
 import pandas as pd
+import requests
 import sasoptpy as so
+from bs4 import BeautifulSoup
+from dotenv import load_dotenv
 
-MAX_TRANSFERS_PER_GW = 3
+BASE_URL = "https://fantasyloi.leagueofireland.ie"
+
+
+def get_live_data(options):
+    load_dotenv()
+    cookies = {"LOIFF": os.getenv("LOIFF")}
+    with requests.Session() as s:
+        r = s.get(f"{BASE_URL}/Team/TeamSheet", cookies=cookies)
+        soup = BeautifulSoup(r.text, "html.parser")
+        next_gw = int([x for x in soup.find_all("strong") if "GW" in x.text][-1].text.split(" ")[1])
+
+        team_id = options.get("team_id")
+        if not team_id:
+            player_cards = soup.find_all("div", {"data-target": "#viewPlayer"})
+            squad = [int(player["onclick"].split(",")[0].replace("'", "").split("(")[1]) for player in player_cards]
+
+        else:
+            url = f"{BASE_URL}/Results?gameweek={next_gw - 1}&teamId={team_id}"
+            r = s.get(url, cookies=cookies)
+            soup = BeautifulSoup(r.text, "html.parser")
+            player_cards = soup.find_all("div", {"data-target": "#playerScore"})
+            squad = [int(player["onclick"].split(",")[0].replace("'", "").split("(")[1]) for player in player_cards]
+
+    return next_gw, squad
 
 
 def get_random_id(n):
@@ -39,9 +65,26 @@ def solve(runtime_options=None):
 
     horizon = options.get("horizon", 5)
     preseason = options.get("preseason", False)
-    # preseason hard coded value TODO: FIX
+
     if preseason:
         next_gw = 1
+        current_squad = []
+    else:
+        next_gw = options.get("next_gw")
+        current_squad = options.get("current_squad", [])
+
+        if len(current_squad) not in [0, 15]:
+            raise ValueError(f"The length of your current squad list must be either 0 or 15. It is currently {len(current_squad)}")
+
+        if not next_gw or not current_squad:
+            live_data = get_live_data(options)
+            if not next_gw:
+                next_gw = live_data[0]
+            if not current_squad:
+                current_squad = live_data[1]
+            options["next_gw"] = next_gw
+            options["current_squad"] = current_squad
+
     target_gw = options.get("target_gw", next_gw)
     gws = list(range(next_gw, next_gw + horizon))
     all_gws = [next_gw - 1] + gws
@@ -56,7 +99,7 @@ def solve(runtime_options=None):
     players = df.index.to_list()
     el_types = df["Pos"].unique().tolist()
     teams = df["Team"].unique().tolist()
-    player_values = (df["BV"] * 10).to_dict()
+    player_values = (df["Value" if "Value" in df.columns else "BV"] * 10).to_dict()
 
     model = so.Model(name="LOI")
 
@@ -65,7 +108,6 @@ def solve(runtime_options=None):
     bench = model.add_variables(players, all_gws, range(4), name="bench", vartype=so.binary)
     cap = model.add_variables(players, gws, name="cap", vartype=so.binary)
     itb = model.add_variables(all_gws, name="itb", vartype=so.integer, lb=0)
-    # model.add_constraint(itb[1] == 10, name="1.5itb")
     t_in = model.add_variables(players, gws, name="t_in", vartype=so.binary)
     t_out = model.add_variables(players, gws, name="t_out", vartype=so.binary)
     use_wc = model.add_variables(gws, name="use_wc", vartype=so.binary)
@@ -91,6 +133,11 @@ def solve(runtime_options=None):
 
     if preseason:
         model.add_constraint(so.expr_sum(squad[p, 0] for p in players) == 0, name="empty_preseason_squad")
+        model.add_constraint(itb[0] == 1000, name="initial_itb")
+    else:
+        model.add_constraints((squad[p, next_gw - 1] == 1 for p in current_squad), name="initial_squad_players")
+        model.add_constraints((squad[p, next_gw - 1] == 0 for p in players if p not in current_squad), name="initial_squad_others")
+        model.add_constraint(itb[next_gw - 1] == 1000 - so.expr_sum(player_values[p] for p in current_squad), name="initial_itb")
 
     # Ensure correct amount of players in squad by position
     player_el_types = df["Pos"].to_dict()
@@ -132,8 +179,6 @@ def solve(runtime_options=None):
     )
 
     # Transfer logic
-    if preseason:
-        model.add_constraint(itb[next_gw - 1] == 1000, name="initial_itb")
     n_transfers = {w: so.expr_sum(t_in[p, w] for p in players) for w in gws}
     bought_amount = {w: so.expr_sum(player_values[p] * t_in[p, w] for p in players) for w in gws}
     sold_amount = {w: so.expr_sum(player_values[p] * t_out[p, w] for p in players) for w in gws}
@@ -143,7 +188,7 @@ def solve(runtime_options=None):
         name="tr_in_out_limit",
     )
 
-    transfers_allowed = {w: (15 if w == 1 else 1 - use_wc[w]) * MAX_TRANSFERS_PER_GW + use_wc[w] * 15 for w in gws}
+    transfers_allowed = {w: (15 if w == 1 else 1 - use_wc[w]) * 3 + use_wc[w] * 15 for w in gws}
     model.add_constraints(
         (so.expr_sum(t_in[p, w] for p in players) <= transfers_allowed[w] for w in gws),
         name="max_transfers_per_gw",
@@ -560,7 +605,6 @@ def solve(runtime_options=None):
     # write solutions to csv
     for result in solutions:
         it = result["iter"]
-        print(result["summary"])
         time_now = datetime.datetime.now()
         stamp = time_now.strftime("%Y-%m-%d_%H-%M-%S")
         solve_name = "sens_" + options["run_no"] if "run_no" in options else "regular"
@@ -570,14 +614,12 @@ def solve(runtime_options=None):
         else:
             filename = f"{solve_name}_{stamp}_{it}"
         result["picks"].to_csv("results/" + filename + ".csv")
-    return solutions
+    return options, solutions
 
 
 def print_solutions(options, solutions):
     horizon = options.get("horizon", 5)
-    preseason = options.get("preseason", False)
-    if preseason:
-        next_gw = 1
+    next_gw = options.get("next_gw")
     gws = list(range(next_gw, next_gw + horizon))
     # Detailed print, e.g.
     # GW2: A, B, C -> D, E, F
@@ -599,18 +641,19 @@ def print_solutions(options, solutions):
                 line_text += sell_text + " -> " + buy_text
             else:
                 line_text += "Roll"
-            print(f"\tGW{gw}: {line_text}")
+            print(f"GW{gw}: {line_text}")
 
     result_table = pd.DataFrame(solutions)
     result_table = result_table.sort_values(by="score", ascending=False)
-    print(result_table[["iter", "sell", "buy", "chip", "score"]].to_string(index=False))
+    print("\n", result_table[["iter", "sell", "buy", "chip", "score"]].to_string(index=False))
 
 
 def main():
     with open("settings.json", "r") as f:
         options = json.load(f)
-    solutions = solve(options)
-    print_solutions(options, solutions)
+
+    new_options, solutions = solve(options)
+    print_solutions(new_options, solutions)
 
 
 if __name__ == "__main__":
