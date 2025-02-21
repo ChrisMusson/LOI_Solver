@@ -236,6 +236,37 @@ def solve(runtime_options=None):
             elif isinstance(x, list):
                 model.add_constraint(squad[x[0], x[w]] == 0, name=f"banned_{x[0]}_{x[1]}")
 
+    if options.get("formation"):
+        print("OC - Formation")
+        formation = options.get("formation")
+        if isinstance(formation, str):
+            # force given formation in every gameweek
+            formation = [int(x) for x in "".join(formation.split("-"))]
+            model.add_constraints(
+                (
+                    so.expr_sum(lineup[p, w] for p in players if player_el_types[p] == pos) == formation[i]
+                    for i, pos in enumerate(el_types[1:])
+                    for w in gws
+                ),
+                name="force_formation",
+            )
+        elif isinstance(formation, list):
+            # will be a list of [formation, gameweek] pairs
+            if [type(x) for x in formation] != [list] * len(formation):
+                raise TypeError('Your list of formations is not of the form [["442", 2], ["541", 3]]')
+
+            model.add_constraints(
+                (
+                    so.expr_sum(lineup[p, w] for p in players if player_el_types[p] == pos) == [int(x) for x in "".join(f.split("-"))][i]
+                    for i, pos in enumerate(el_types[1:])
+                    for f, w in formation
+                ),
+                name="force_formation",
+            )
+
+        else:
+            raise TypeError('Your formation setting must either be a string like "442" or a list of lists like [["442", 2], ["541", 3]]')
+
     # Objective
     pts_player_week = {(p, w): df.loc[p, f"{w}_Pts"] for p in players for w in gws}
     lineup_pts = {w: so.expr_sum(pts_player_week[p, w] * (lineup[p, w] + cap[p, w] + use_tc[p, w]) for p in players) for w in gws}
