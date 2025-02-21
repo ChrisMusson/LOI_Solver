@@ -21,6 +21,8 @@ Mostly the same as the FPL solver. To clarify the differences:
 - `banned`: same as locked
 - `current_squad`: a 15-integer-long list of the IDs of the 15 players in your current squad. These IDs must match up with the IDs in your `xpts.csv` file. This must be used when you haven't saved the cookie value to a .env file. Can be removed from `settings.json` or left as `[]` if you have saved the `LOIFF` cookie to `.env`. In this case, it will automatically fetch your squad of 15 players from the previous gameweek
 - `next_gw`: the gameweek to solve from. This must be used when you haven't saved the cookie value to a .env file. Can be removed from `settings.json` or left as `null` if you have saved the `LOIFF` cookie to `.env`. In this case, it will default to the next available gameweek
+- `formation`: the formation of the lineup. Can either be a string like "442" to lock 442 for every week in the horizon, or a list of lists like [["442", 2], ["541", 3]] to lock 442 in gw2 and 541 in gw3, for example
+
 # Sensitivity Analysis
 
 The aim of the sensitivity analysis is to randomise the xpts for all players based on their xmins and then solve with these new xpts. This is repeated many times and then you can find the transfers that come out as optimal most often. To do this,
