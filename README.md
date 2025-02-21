@@ -9,6 +9,8 @@ A modifed version of the FPL Solver found here: https://github.com/sertalpbilal/
 - edit settings in `settings.json`, most importantly the path to your `highs.exe` executable. You will then also need to give the solver a way of finding your current squad and the gameweek to solve from. You can do this in two ways:
   1. Save the login cookie value to a .env file - log in to [the website](https://fantasyloi.leagueofireland.ie/) and press F12 to open developer tools. Navigate to `Application -> Cookies` if using chrome, or `Storage -> Cookies` if using firefox. Copy the value of the `LOIFF` cookie to a new file named `.env`, whose content is a single line `LOIFF=CfDJ...5XA`, where `CfDJ...5XA` is the copied value of your cookie
   1. Supply your current_squad and next_gw manually - add `"next_gw": gw,` and `"current_squad": [A, B, ..., N, O],` to `settings.json`, where `gw` is the gameweek you want to solve from and `[A, B, ..., N, O]` is a 15-integer-long list of the IDs of the 15 players in your current squad. These IDs must match up with the IDs in your `xpts.csv` file
+> **_NOTE:_**  If you are using Vamps' xpts model, then you will need to use option 2 here as the IDs from that model and the fantasy LOI website are not the same. You can use either method with models that use the same IDs as the fantasy LOI website, e.g. the MooSwish model
+
 - `python solve.py`
 
 If you have the cookie saved to a `.env` file, you can then solve for any given team_id you like by adding the `"team_id": x,` setting to `settings.json`. This cookie value will have to be updated once every two weeks
