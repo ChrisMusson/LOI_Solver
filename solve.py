@@ -267,6 +267,9 @@ def solve(runtime_options=None):
         else:
             raise TypeError('Your formation setting must either be a string like "442" or a list of lists like [["442", 2], ["541", 3]]')
 
+    if options.get("no_future_transfers"):
+        model.add_constraints((n_transfers[w] == 0 for w in gws[1:]), name="no_future_transfers")
+
     # Objective
     pts_player_week = {(p, w): df.loc[p, f"{w}_Pts"] for p in players for w in gws}
     lineup_pts = {w: so.expr_sum(pts_player_week[p, w] * (lineup[p, w] + cap[p, w] + use_tc[p, w]) for p in players) for w in gws}

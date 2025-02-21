@@ -13,5 +13,6 @@
     "banned": [],
     "iterations": 1,
     "randomised": false,
-    "gap": 0
+    "gap": 0,
+    "no_future_transfers": false
 }
