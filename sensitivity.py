@@ -158,7 +158,7 @@ def read_sensitivity(options=None):
             print()
             print(f"Number of plans: {no_plans}")
             print()
-            iter_scoring = {1: 10, 2: 9, 3: 8}
+            iter_scoring = {0: 10, 1: 9, 2: 8}
             buy_df = pd.DataFrame(buys)
             buy_pivot = buy_df.pivot_table(index="move", columns="iter", aggfunc="size", fill_value=0)
             iters = sorted(buy_df["iter"].unique())
