@@ -90,10 +90,11 @@ def solve(runtime_options=None):
     all_gws = [next_gw - 1] + gws
 
     df = pd.read_csv("xpts.csv", index_col="ID", encoding="cp850").fillna(0)
+    vamps = any("_xMin" in x for x in df.columns)
     if options.get("randomised", False):
         rng = np.random.default_rng(seed=options.get("seed"))
         for w in gws:
-            noise = df[f"{w}_Pts"] * (92 - df[f"{w}_xMins"]) / 134 * rng.standard_normal(size=len(df))
+            noise = df[f"{w}_Pts"] * (92 - df[f"{w}_xMin" if vamps else "xMin"]) / 134 * rng.standard_normal(size=len(df))
             df[f"{w}_Pts"] = df[f"{w}_Pts"] + noise
 
     players = df.index.to_list()

@@ -8,8 +8,6 @@ from solve import solve
 
 def run_sensitivity(options=None):
     if options is None or "count" not in options:
-        # print("Remember to delete results folder and enable noise! Also note: you may reach your results faster to run multiple tabs of this script")
-        # print("")
         runs = int(input("How many simulations would you like to run? "))
         processes = int(input("How many processes you want to run in parallel? "))
     else:
