@@ -247,6 +247,7 @@ def solve(runtime_options=None):
                 (
                     so.expr_sum(lineup[p, w] for p in players if player_el_types[p] == pos) == formation[i]
                     for i, pos in enumerate(el_types[1:])
+                    if formation[i] > 0
                     for w in gws
                 ),
                 name="force_formation",
@@ -258,9 +259,12 @@ def solve(runtime_options=None):
 
             for f, w in formation:
                 f = [int(x) for x in "".join(f.split("-"))]
-                print(f, w)
                 model.add_constraints(
-                    (so.expr_sum(lineup[p, w] for p in players if player_el_types[p] == pos) == f[i] for i, pos in enumerate(el_types[1:])),
+                    (
+                        so.expr_sum(lineup[p, w] for p in players if player_el_types[p] == pos) == f[i]
+                        for i, pos in enumerate(el_types[1:])
+                        if f[i] > 0
+                    ),
                     name=f"force_formation_gw_{w}",
                 )
 
