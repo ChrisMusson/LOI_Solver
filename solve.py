@@ -580,7 +580,7 @@ def solve(runtime_options=None):
                 type_players = lineup_players.loc[lineup_players["type"] == pos]
                 entries = type_players.apply(get_display, axis=1)
                 summary_of_actions += "\t" + ", ".join(entries.tolist()) + "\n"
-            summary_of_actions += "Bench: \n\t" + ", ".join(bench_players["name"].tolist()) + "\n"
+            summary_of_actions += "Bench: \n\t" + ", ".join(bench_players.apply(get_display, axis=1).to_list()) + "\n"
             summary_of_actions += "Lineup xPts: " + str(round(lineup_players["xp_cont"].sum(), 2)) + "\n"
             summary_of_actions += "---\n\n"
             cumulative_xpts = cumulative_xpts + round(lineup_players["xp_cont"].sum(), 2)
