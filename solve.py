@@ -256,14 +256,13 @@ def solve(runtime_options=None):
             if [type(x) for x in formation] != [list] * len(formation):
                 raise TypeError('Your list of formations is not of the form [["442", 2], ["541", 3]]')
 
-            model.add_constraints(
-                (
-                    so.expr_sum(lineup[p, w] for p in players if player_el_types[p] == pos) == [int(x) for x in "".join(f.split("-"))][i]
-                    for i, pos in enumerate(el_types[1:])
-                    for f, w in formation
-                ),
-                name="force_formation",
-            )
+            for f, w in formation:
+                f = [int(x) for x in "".join(f.split("-"))]
+                print(f, w)
+                model.add_constraints(
+                    (so.expr_sum(lineup[p, w] for p in players if player_el_types[p] == pos) == f[i] for i, pos in enumerate(el_types[1:])),
+                    name=f"force_formation_gw_{w}",
+                )
 
         else:
             raise TypeError('Your formation setting must either be a string like "442" or a list of lists like [["442", 2], ["541", 3]]')
