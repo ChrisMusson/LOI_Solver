@@ -15,6 +15,8 @@ import sasoptpy as so
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 
+from visualisation import create_squad_timeline
+
 BASE_URL = "https://fantasyloi.leagueofireland.ie"
 
 
@@ -533,7 +535,9 @@ def solve(runtime_options=None):
                         }
                     )
 
-        picks_df = pd.DataFrame(picks).sort_values(by=["week", "lineup", "type", "xP"], ascending=[True, False, True, True])
+        picks_df = pd.DataFrame(picks)
+        picks_df["type"] = pd.Categorical(picks_df["type"], categories=["G", "D", "M", "F"], ordered=True)
+        picks_df = picks_df.sort_values(by=["week", "lineup", "type", "xP"], ascending=[True, False, True, True])
         total_xp = so.expr_sum((lineup[p, w] + cap[p, w]) * pts_player_week[p, w] for p in players for w in gws).get_value()
 
         picks_df.sort_values(by=["week", "squad", "lineup", "bench", "type"], ascending=[True, False, False, True, True], inplace=True)
@@ -544,7 +548,7 @@ def solve(runtime_options=None):
         cumulative_xpts = 0
 
         # collect statistics
-        statistics = {}
+        statistics = {next_gw - 1: {"itb": itb[next_gw - 1].get_value()}}
         for w in gws:
             summary_of_actions += f"** GW {w}:\n"
             chip_decision = (
@@ -652,6 +656,9 @@ def solve(runtime_options=None):
         else:
             filename = f"{solve_name}_{stamp}_{it}"
         result["picks"].to_csv("results/" + filename + ".csv")
+
+        if options.get("export_image", False):
+            create_squad_timeline(current_squad=current_squad, statistics=result["statistics"], picks=result["picks"], filename=filename)
     return options, solutions
 
 
