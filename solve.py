@@ -119,8 +119,9 @@ def solve(runtime_options=None):
     use_tc_gw = {w: so.expr_sum(use_tc[p, w] for p in players) for w in gws}
 
     model.add_constraint(so.expr_sum(use_wc[w] for w in gws) <= 1, name="max_one_wc")
+    model.add_constraint(so.expr_sum(use_bb[w] for w in gws) <= 1, name="max_one_bb")
     model.add_constraints((so.expr_sum(squad[p, w] for p in players) == 15 for w in gws), name="15_man_squad")
-    model.add_constraints((so.expr_sum(lineup[p, w] for p in players) == 11 for w in gws), name="11_man_lineup")
+    model.add_constraints((so.expr_sum(lineup[p, w] for p in players) == 11 + 4 * use_bb[w] for w in gws), name="lineup_size")
     model.add_constraints((so.expr_sum(cap[p, w] for p in players) == 1 for w in gws), name="one_cap_per_gw")
     model.add_constraints((cap[p, w] <= lineup[p, w] for p in players for w in gws), name="cap_in_lineup")
 
@@ -163,7 +164,7 @@ def solve(runtime_options=None):
         name="min_pos_in_lineup",
     )
     model.add_constraints(
-        (lineup_type_count[t, w] <= type_data[t]["max"] for t in el_types for w in gws),
+        (lineup_type_count[t, w] <= type_data[t]["max"] + use_bb[w] for t in el_types for w in gws),
         name="max_pos_in_lineup",
     )
     model.add_constraints(
@@ -227,6 +228,12 @@ def solve(runtime_options=None):
     else:
         model.add_constraint(so.expr_sum(use_wc[w] for w in gws) == 0, name="no_wc_used")
 
+    if options.get("use_bb"):
+        gw = options["use_bb"]
+        model.add_constraint(use_bb[gw] == 1, name="force_bb")
+    else:
+        model.add_constraint(so.expr_sum(use_bb[w] for w in gws) == 0, name="no_bb_used")
+
     if options.get("locked"):
         print("OC - Locked")
         for x in options["locked"]:
@@ -284,8 +291,8 @@ def solve(runtime_options=None):
     pts_player_week = {(p, w): df.loc[p, f"{w}_Pts"] for p in players for w in gws}
     lineup_pts = {w: so.expr_sum(pts_player_week[p, w] * (lineup[p, w] + cap[p, w] + use_tc[p, w]) for p in players) for w in gws}
 
-    model.add_constraints((so.expr_sum(bench[p, w, n] for n in range(4) for p in players) == 4 for w in gws), name="4_subs")
-    model.add_constraints((so.expr_sum(bench[p, w, 0] for p in players if player_el_types[p] == "G") == 1 for w in gws), name="GK_sub0")
+    model.add_constraints((so.expr_sum(bench[p, w, n] for n in range(4) for p in players) == 4 - 4 * use_bb[w] for w in gws), name="4_subs")
+    model.add_constraints((so.expr_sum(bench[p, w, 0] for p in players if player_el_types[p] == "G") == 1 - use_bb[w] for w in gws), name="GK_sub0")
 
     # workaround for now, setting the 0th sub (GK) and last sub to contribute sub_weight**2 to xp
     # TODO: add proper bench contributions
