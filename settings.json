@@ -14,5 +14,6 @@
     "iterations": 1,
     "randomised": false,
     "gap": 0,
-    "no_future_transfers": false
+    "no_future_transfers": false,
+    "ft_penalty": 0
 }

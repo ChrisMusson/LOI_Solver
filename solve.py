@@ -207,6 +207,10 @@ def solve(runtime_options=None):
         name="cont_budget",
     )
 
+    total_transfers_allowed = options.get("total_transfers")
+    if isinstance(total_transfers_allowed, int) and total_transfers_allowed > 0:
+        model.add_constraint(so.expr_sum(n_transfers[w] for w in gws) <= total_transfers_allowed, name="total_transfers_allowed")
+
     # Chip constraints
     model.add_constraints((use_wc[w] + use_bb[w] + use_tc_gw[w] <= 1 for w in gws), name="single_chip")
     model.add_constraints((use_tc[p, w] <= cap[p, w] for p in players for w in gws), name="tc_same_as_cap")
@@ -297,13 +301,16 @@ def solve(runtime_options=None):
         name="sub1_sub2_diff_positions",
     )
 
+    ft_penalty = options.get("ft_penalty", 0)
+    ft_penalty_obj = {w: ft_penalty * n_transfers[w] for w in gws}
+
     # model.add_constraint(bench[17, 1, 0] == 1, name="sub0")
     # model.add_constraint(bench[3, 1, 1] == 1, name="sub1")
     # model.add_constraint(bench[4, 1, 2] == 1, name="sub2")
     # model.add_constraint(bench[6, 1, 3] == 1, name="sub3")
 
     bench_pts = {w: sub0[w] + sub1[w] + sub2[w] + sub3[w] for w in gws}
-    gw_pts = {w: lineup_pts[w] + bench_pts[w] for w in gws}
+    gw_pts = {w: lineup_pts[w] + bench_pts[w] - ft_penalty_obj[w] for w in gws}
 
     decay = options.get("decay", 0.9)
     total_xp = so.expr_sum(gw_pts[w] * decay**i for i, w in enumerate(gws))
