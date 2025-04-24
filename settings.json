@@ -16,5 +16,6 @@
     "randomised": false,
     "gap": 0,
     "no_future_transfers": false,
-    "ft_penalty": 0
+    "ft_penalty": 0,
+    "solutions_file": null
 }
