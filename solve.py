@@ -53,18 +53,54 @@ def solve(runtime_options=None):
         options = json.load(f)
 
     solve_name = "sens_" + options["run_no"] if "run_no" in options else f"reg_{get_random_id(5)}"
-
     parser = argparse.ArgumentParser(add_help=False)
-    for key in options.keys():
-        if isinstance(options[key], (list, dict)):
+    cl_args = parser.parse_known_args()[1]
+
+    for key, value in options.items():
+        if value is None or isinstance(value, (list, dict)):
+            parser.add_argument(f"--{key}", default=value)
+            continue
+        parser.add_argument(f"--{key}", type=type(value), default=value)
+
+    # Parse cl args, which will take priority over default args in options dict
+    args = vars(parser.parse_args(cl_args))
+
+    # this code block is to look at command line arguments (read as a string) and determine what type
+    # they should be when there is no default argument type set by the code above
+    for key, value in args.items():
+        if key not in options:
+            continue
+        if value == options[key]:  # skip anything that hasn't been edited by command line argument
             continue
 
-        parser.add_argument(f"--{key}", default=options[key], type=type(options[key]))
+        if options[key] is None or isinstance(options[key], (list, dict)):
+            if value.isdigit():
+                args[key] = int(value)
+                continue
 
-    args = parser.parse_known_args()[0]
-    options = {**options, **vars(args)}
+            try:
+                args[key] = float(value)
+                continue
+            except ValueError:
+                pass
+
+            if value[0] in "[{":
+                try:
+                    args[key] = json.loads(value)
+                    continue
+                except json.JSONDecodeError:
+                    value = value.replace("'", '"')
+                    args[key] = json.loads(value)
+                    continue
+                finally:
+                    pass
+            print(f"Problem with CL argument: {key}. Original value: {options[key]}, New value: {value}")
+
+    options.update(args)
+
+    # runtime options take absolute priority other other option input methods. It is used in run_parallel.py and simulations.py
     if runtime_options is not None:
-        options = {**options, **runtime_options}
+        options.update(runtime_options)
 
     horizon = options.get("horizon", 5)
     preseason = options.get("preseason", False)
@@ -676,7 +712,8 @@ def solve(runtime_options=None):
 
         if options.get("export_image", False):
             create_squad_timeline(current_squad=current_squad, statistics=result["statistics"], picks=result["picks"], filename=filename)
-    return options, solutions
+
+    print_solutions(options, solutions)
 
 
 def print_solutions(options, solutions):
@@ -745,11 +782,7 @@ def write_line_to_file(filename, result, options):
 
 
 def main():
-    with open("settings.json", "r") as f:
-        options = json.load(f)
-
-    new_options, solutions = solve(options)
-    print_solutions(new_options, solutions)
+    solve()
 
 
 if __name__ == "__main__":
