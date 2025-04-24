@@ -1,4 +1,5 @@
 import argparse
+import csv
 import datetime
 import json
 import os
@@ -658,6 +659,8 @@ def solve(runtime_options=None):
         )
         model.add_constraint(actions >= 1, name=f"cutoff_{it}")
 
+    run_id = get_random_id(6)
+    options["run_id"] = run_id
     # write solutions to csv
     for result in solutions:
         it = result["iter"]
@@ -705,6 +708,40 @@ def print_solutions(options, solutions):
     result_table = pd.DataFrame(solutions)
     result_table = result_table.sort_values(by="score", ascending=False)
     print("\n", result_table[["iter", "sell", "buy", "chip", "score"]].to_string(index=False))
+
+    solutions_file = options.get("solutions_file")
+    if solutions_file:
+        write_line_to_file(solutions_file, result, options)
+
+
+def write_line_to_file(filename, result, options):
+    t = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+    gw = min(result["picks"]["week"])
+    score = round(result["score"], 3)
+    picks = result["picks"]
+
+    cap = picks[(picks["week"] == gw) & (picks["cap"] > 0.5)].iloc[0]["name"]
+    run_id = options["run_id"]
+    iter = result["iter"]
+    team_id = options.get("team_id")
+    chips = [options.get(x, 0) for x in ["use_wc", "use_bb", "use_tc"]]
+    sell_text = ", ".join(picks[(picks["week"] == gw) & (picks["t_out"] == 1)]["name"].to_list())
+    buy_text = ", ".join(picks[(picks["week"] == gw) & (picks["t_in"] == 1)]["name"].to_list())
+
+    headers = ["run_id", "iter", "user_id", "wc", "bb", "tc", "cap", "sell", "buy", "score", "datetime"]
+    data = [run_id, iter, team_id] + chips + [cap, sell_text, buy_text, score, t]
+    if options.get("show_summary", False):
+        headers.append("summary")
+        data.append(result["summary"])
+
+    if not os.path.exists(filename):
+        with open(filename, "w", newline="") as f:
+            writer = csv.writer(f)
+            writer.writerow(headers)
+
+    with open(filename, "a", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(data)
 
 
 def main():
