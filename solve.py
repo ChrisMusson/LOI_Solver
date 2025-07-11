@@ -285,7 +285,7 @@ def solve(runtime_options=None):
             if isinstance(x, int):
                 model.add_constraints((squad[x, w] == 0 for w in gws), name=f"banned_{x}")
             elif isinstance(x, list):
-                model.add_constraint(squad[x[0], x[w]] == 0, name=f"banned_{x[0]}_{x[1]}")
+                model.add_constraint(squad[x[0], x[1]] == 0, name=f"banned_{x[0]}_{x[1]}")
 
     if options.get("formation"):
         print("OC - Formation")
@@ -323,6 +323,37 @@ def solve(runtime_options=None):
 
     if options.get("no_future_transfers"):
         model.add_constraints((n_transfers[w] == 0 for w in gws[1:]), name="no_future_transfers")
+
+    for i, x in enumerate(options.get("position_constraints", [])):
+        teams = x.get("teams", [])
+        spec_gws = x.get("gws", [next_gw])
+        spec_positions = x.get("pos", "GD")
+        num = x.get("num", 1)
+        typ = x.get("type", "min")
+        sl = x.get("squad_lineup", "squad")
+
+        print(x)
+
+        sls = {"squad": squad, "lineup": lineup}
+        if typ == "min":
+            model.add_constraints(
+                (
+                    so.expr_sum(sls[sl][p, w] for p in players for team in teams if player_el_types[p] in spec_positions and player_teams[p] == team)
+                    >= num
+                    for w in spec_gws
+                ),
+                name=f"min_team_pos_constraint_{i}",
+            )
+
+        elif typ == "max":
+            model.add_constraints(
+                (
+                    so.expr_sum(sls[sl][p, w] for p in players for team in teams if player_teams[p] == team and player_el_types[p] in spec_positions)
+                    <= num
+                    for w in spec_gws
+                ),
+                name=f"max_team_pos_constraint_{i}",
+            )
 
     # Objective
     pts_player_week = {(p, w): df.loc[p, f"{w}_Pts"] for p in players for w in gws}
