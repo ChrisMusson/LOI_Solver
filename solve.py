@@ -9,6 +9,7 @@ import subprocess
 import threading
 import time
 
+import highspy
 import numpy as np
 import pandas as pd
 import requests
@@ -405,68 +406,25 @@ def solve(runtime_options=None):
         model.export_mps(mps_file_name)
 
         if solver == "highs":
-            highs_exec = options.get("solver_path") or "highs"
-
             secs = options.get("secs", 20 * 60)
             presolve = options.get("presolve", "on")
             gap = options.get("gap", 0)
             random_seed = options.get("random_seed", 0)
 
-            with open(opt_file_name, "w") as f:
-                f.write(f"""mip_rel_gap = {gap}""")
+            h = highspy.Highs()
+            h.setOptionValue("random_seed", int(random_seed))
+            h.setOptionValue("presolve", str(presolve))
+            h.setOptionValue("time_limit", float(secs))
+            h.setOptionValue("mip_rel_gap", float(gap))
 
-            command = f"{highs_exec} --parallel on --options_file {opt_file_name} --random_seed {random_seed} --presolve {presolve} --model_file {mps_file_name} --time_limit {secs} --solution_file {sol_file_name}"
+            # Optional: mimic "--parallel on" (0 = automatic)
+            h.setOptionValue("threads", int(options.get("threads", 0)))
 
-            if use_cmd:
-                os.system(command)
-            else:
+            h.readModel(mps_file_name)
+            h.run()
 
-                def print_output(process):
-                    while True:
-                        try:
-                            output = process.stdout.readline()
-                            if "Solving report" in output:
-                                time.sleep(2)
-                                process.kill()
-                            elif output == "" and process.poll() is not None:
-                                break
-                            elif output:
-                                print(output.strip())
-                        except Exception:
-                            print("File closed")
-                            break
-                    process.kill()
-
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                output_thread = threading.Thread(target=print_output, args=(process,))
-                output_thread.start()
-                output_thread.join()
-
-            # Parsing
-            with open(sol_file_name, "r") as f:
-                for v in model.get_variables():
-                    v.set_value(0)
-                cols_started = False
-                for line in f:
-                    if not cols_started and "# Columns" not in line:
-                        continue
-                    elif "# Columns" in line:
-                        cols_started = True
-                        continue
-                    elif cols_started and line[0] != "#":
-                        words = line.split()
-                        v = model.get_variable(words[0])
-                        try:
-                            if v.get_type() == so.INT:
-                                v.set_value(round(float(words[1])))
-                            elif v.get_type() == so.BIN:
-                                v.set_value(round(float(words[1])))
-                            elif v.get_type() == so.CONT:
-                                v.set_value(round(float(words[1]), 3))
-                        except Exception:
-                            print("Error", words[0], line)
-                    elif line[0] == "#":
-                        break
+            # Write a HiGHS solution file that your existing parser reads ("# Columns" section)
+            h.writeSolution(sol_file_name)
 
         elif solver == "copt":
             sol_file_name = sol_file_name.replace("_sol", "").replace("txt", "sol")
@@ -749,7 +707,7 @@ def solve(runtime_options=None):
 
 def print_solutions(options, solutions):
     horizon = options.get("horizon", 5)
-    next_gw = options.get("next_gw")
+    next_gw = 1 if options.get("preseason") else options.get("next_gw")
     gws = list(range(next_gw, next_gw + horizon))
     # Detailed print, e.g.
     # GW2: A, B, C -> D, E, F

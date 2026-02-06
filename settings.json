@@ -3,7 +3,7 @@
     "horizon": 6,
     "solver": "highs",
     "solver_path": "",
-    "preseason": false,
+    "preseason": true,
     "use_wc": 0,
     "use_tc": 0,
     "use_bb": 0,

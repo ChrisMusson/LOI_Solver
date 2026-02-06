@@ -1,7 +1,9 @@
 beautifulsoup4==4.13.3
 certifi==2025.1.31
 charset-normalizer==3.4.1
+highspy==1.13.0
 idna==3.10
+matplotlib==3.10.8
 numpy==2.2.3
 pandas==2.2.3
 python-dateutil==2.9.0.post0
