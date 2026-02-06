@@ -17,7 +17,7 @@ def run_sensitivity(options=None):
     start = time.time()
     all_jobs = [{"run_no": str(i + 1), "randomised": True} for i in range(runs)]
     with ProcessPoolExecutor(max_workers=processes) as executor:
-        executor.map(solve, all_jobs)
+        list(executor.map(solve, all_jobs))
     end = time.time()
     print(f"\nTotal time taken is {(end - start) / 60:.2f} minutes")
 
