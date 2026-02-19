@@ -1,4 +1,3 @@
-import subprocess
 from concurrent.futures import ProcessPoolExecutor
 from itertools import product
 

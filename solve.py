@@ -26,15 +26,19 @@ def get_live_data(options):
     load_dotenv()
     cookies = {"LOIFF": os.getenv("LOIFF")}
     with requests.Session() as s:
-        r = s.get(f"{BASE_URL}/Team/TeamSheet", cookies=cookies)
+        r = s.get(f"{BASE_URL}/Team/Transfers", cookies=cookies)
         soup = BeautifulSoup(r.text, "html.parser")
         next_gw = int([x for x in soup.find_all("strong") if "GW" in x.text][-1].text.split(" ")[1])
 
         team_id = options.get("team_id")
-        if not team_id:
-            player_cards = soup.find_all("div", {"data-target": "#viewPlayer"})
-            squad = [int(player["onclick"].split(",")[0].replace("'", "").split("(")[1]) for player in player_cards]
+        itb = options.get("initial_itb")
 
+        if itb is None:
+            budget = next(x.text for x in soup.find_all("label") if x.text.startswith("Balance"))
+            itb = int(10 * float(budget.split("€")[1].strip()))
+
+        if not team_id:
+            squad = options.get("current_squad", [])
         else:
             url = f"{BASE_URL}/Results?gameweek={next_gw - 1}&teamId={team_id}"
             r = s.get(url, cookies=cookies)
@@ -42,7 +46,9 @@ def get_live_data(options):
             player_cards = soup.find_all("div", {"data-target": "#playerScore"})
             squad = [int(player["onclick"].split(",")[0].replace("'", "").split("(")[1]) for player in player_cards]
 
-    return next_gw, squad
+        assert len(squad) == 15, f"Expected to find 15 players in your squad, but found {len(squad)}"
+
+    return next_gw, squad, itb
 
 
 def get_random_id(n):
@@ -109,21 +115,21 @@ def solve(runtime_options=None):
     if preseason:
         next_gw = 1
         current_squad = []
+        itb = 1000
     else:
         next_gw = options.get("next_gw")
         current_squad = options.get("current_squad", [])
+        itb = options.get("initial_itb", 0.0)
 
         if len(current_squad) not in [0, 15]:
             raise ValueError(f"The length of your current squad list must be either 0 or 15. It is currently {len(current_squad)}")
 
-        if not next_gw or not current_squad:
-            live_data = get_live_data(options)
-            if not next_gw:
-                next_gw = live_data[0]
-            if not current_squad:
-                current_squad = live_data[1]
+        if not next_gw or not current_squad or not itb:
+            print("Fetching live data because one of 'next_gw', 'current_squad' or 'initial_itb' have not been provided.")
+            next_gw, current_squad, itb = get_live_data(options)
             options["next_gw"] = next_gw
             options["current_squad"] = current_squad
+            options["initial_itb"] = itb
 
     target_gw = options.get("target_gw", next_gw)
     gws = list(range(next_gw, next_gw + horizon))
@@ -179,7 +185,7 @@ def solve(runtime_options=None):
     else:
         model.add_constraints((squad[p, next_gw - 1] == 1 for p in current_squad), name="initial_squad_players")
         model.add_constraints((squad[p, next_gw - 1] == 0 for p in players if p not in current_squad), name="initial_squad_others")
-        model.add_constraint(itb[next_gw - 1] == 1000 - so.expr_sum(player_values[p] for p in current_squad), name="initial_itb")
+        model.add_constraint(itb[next_gw - 1] == options["initial_itb"], name="initial_itb")
 
     # Ensure correct amount of players in squad by position
     player_el_types = df["Pos"].to_dict()
@@ -356,6 +362,16 @@ def solve(runtime_options=None):
                 name=f"max_team_pos_constraint_{i}",
             )
 
+        elif typ == "exact":
+            model.add_constraints(
+                (
+                    so.expr_sum(sls[sl][p, w] for p in players for team in teams if player_teams[p] == team and player_el_types[p] in spec_positions)
+                    == num
+                    for w in spec_gws
+                ),
+                name=f"exact_team_pos_constraint_{i}",
+            )
+
     # Objective
     pts_player_week = {(p, w): df.loc[p, f"{w}_Pts"] for p in players for w in gws}
     lineup_pts = {w: so.expr_sum(pts_player_week[p, w] * (lineup[p, w] + cap[p, w] + use_tc[p, w]) for p in players) for w in gws}
@@ -405,72 +421,28 @@ def solve(runtime_options=None):
 
         model.export_mps(mps_file_name)
 
-        if solver == "highs":
+        if solver.lower() == "highs":
+            # Use highspy Python interface instead of command line
             secs = options.get("secs", 20 * 60)
             presolve = options.get("presolve", "on")
             gap = options.get("gap", 0)
             random_seed = options.get("random_seed", 0)
+            verbose = options.get("verbose", True)
 
-            h = highspy.Highs()
-            h.setOptionValue("random_seed", int(random_seed))
-            h.setOptionValue("presolve", str(presolve))
-            h.setOptionValue("time_limit", float(secs))
-            h.setOptionValue("mip_rel_gap", float(gap))
+            solver_instance = highspy.Highs()
+            solver_instance.readModel(str(mps_file_name))
+            solver_instance.setOptionValue("parallel", "on")
+            solver_instance.setOptionValue("random_seed", random_seed)
+            solver_instance.setOptionValue("presolve", presolve)
+            solver_instance.setOptionValue("time_limit", secs)
+            solver_instance.setOptionValue("mip_rel_gap", gap)
+            solver_instance.setOptionValue("log_to_console", verbose)
 
-            # Optional: mimic "--parallel on" (0 = automatic)
-            h.setOptionValue("threads", int(options.get("threads", 0)))
-
-            h.readModel(mps_file_name)
-            h.run()
-
-            # Write a HiGHS solution file that your existing parser reads ("# Columns" section)
-            h.writeSolution(sol_file_name)
-
-        elif solver == "copt":
-            sol_file_name = sol_file_name.replace("_sol", "").replace("txt", "sol")
-            gap = options.get("gap", 0)
-            command = f'copt_cmd -c "set RelGap {gap};readmps {mps_file_name};optimize;writesol {sol_file_name};quit"'
-            if use_cmd:
-                os.system(command)
-            else:
-
-                def print_output(process):
-                    while True:
-                        output = process.stdout.readline()
-                        if "Solving report" in output:
-                            time.sleep(2)
-                            process.kill()
-                        elif output == "" and process.poll() is not None:
-                            break
-                        elif output:
-                            print(output.strip())
-
-                process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
-                output_thread = threading.Thread(target=print_output, args=(process,))
-                output_thread.start()
-                output_thread.join()
-
-            # Parsing
-            with open(sol_file_name, "r") as f:
-                for v in model.get_variables():
-                    v.set_value(0)
-
-                for line in f:
-                    if line == "":
-                        break
-                    if line[0] == "#":
-                        continue
-                    words = line.split()
-                    v = model.get_variable(words[0])
-                    try:
-                        if v.get_type() == so.INT:
-                            v.set_value(round(float(words[1])))
-                        elif v.get_type() == so.BIN:
-                            v.set_value(round(float(words[1])))
-                        elif v.get_type() == so.CONT:
-                            v.set_value(round(float(words[1]), 3))
-                    except Exception:
-                        print("Error", words[0], line)
+            solver_instance.run()
+            solution = solver_instance.getSolution()
+            values = list(solution.col_value)
+            for idx, v in enumerate(model.get_variables()):
+                v.set_value(values[idx])
 
         elif solver == "gurobi":
             gap = options.get("gap", 0)
@@ -576,11 +548,11 @@ def solve(runtime_options=None):
                     )
 
         picks_df = pd.DataFrame(picks)
-        picks_df["type"] = pd.Categorical(picks_df["type"], categories=["G", "D", "M", "F"], ordered=True)
-        picks_df = picks_df.sort_values(by=["week", "lineup", "type", "xP"], ascending=[True, False, True, True])
+        picks_df["pos"] = pd.Categorical(picks_df["pos"], categories=["G", "D", "M", "F"], ordered=True)
+        picks_df = picks_df.sort_values(by=["week", "lineup", "pos", "xP"], ascending=[True, False, True, True])
         total_xp = so.expr_sum((lineup[p, w] + cap[p, w]) * pts_player_week[p, w] for p in players for w in gws).get_value()
 
-        picks_df.sort_values(by=["week", "squad", "lineup", "bench", "type"], ascending=[True, False, False, True, True], inplace=True)
+        picks_df.sort_values(by=["week", "squad", "lineup", "bench", "pos"], ascending=[True, False, False, True, True], inplace=True)
 
         # Writing summary
         summary_of_actions = ""
@@ -697,7 +669,7 @@ def solve(runtime_options=None):
             filename = f"{solve_name}_{bfn}_{stamp}_{it}"
         else:
             filename = f"{solve_name}_{stamp}_{it}"
-        result["picks"].to_csv("results/" + filename + ".csv")
+        result["picks"].to_csv("results/" + filename + ".csv", float_format="%.2f", index=False)
 
         if options.get("export_image", False):
             create_squad_timeline(current_squad=current_squad, statistics=result["statistics"], picks=result["picks"], filename=filename)

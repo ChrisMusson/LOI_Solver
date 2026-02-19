@@ -2,20 +2,19 @@
     "decay": 0.85,
     "horizon": 6,
     "solver": "highs",
-    "solver_path": "",
-    "preseason": true,
+    "preseason": false,
     "use_wc": 0,
     "use_tc": 0,
     "use_bb": 0,
     "team_id": null,
     "current_squad": [],
     "next_gw": null,
+    "initial_itb": null,
     "locked": [],
     "banned": [],
     "iterations": 1,
     "randomised": false,
     "gap": 0,
     "no_future_transfers": false,
-    "ft_penalty": 0,
-    "solutions_file": null
+    "ft_penalty": 0
 }
