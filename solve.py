@@ -6,6 +6,7 @@ import os
 import random
 import string
 import subprocess
+import sys
 import threading
 import time
 
@@ -25,29 +26,54 @@ BASE_URL = "https://fantasyloi.leagueofireland.ie"
 def get_live_data(options):
     load_dotenv()
     cookies = {"LOIFF": os.getenv("LOIFF")}
-    with requests.Session() as s:
-        r = s.get(f"{BASE_URL}/Team/Transfers", cookies=cookies)
-        soup = BeautifulSoup(r.text, "html.parser")
-        next_gw = int([x for x in soup.find_all("strong") if "GW" in x.text][-1].text.split(" ")[1])
 
-        team_id = options.get("team_id")
-        itb = options.get("initial_itb")
+    settings_squad = options.get("current_squad", [])
+    settings_itb = options.get("initial_itb", None)
+    settings_next_gw = options.get("next_gw", None)
+    settings_team_id = options.get("team_id", None)
 
-        if itb is None:
-            budget = next(x.text for x in soup.find_all("label") if x.text.startswith("Balance"))
-            itb = int(10 * float(budget.split("€")[1].strip()))
+    if settings_squad and settings_next_gw is not None and settings_itb is not None:
+        assert len(settings_squad) == 15, f"Expected to find 15 players in your squad, but found {len(settings_squad)}"
+        return settings_next_gw, settings_squad, settings_itb
 
-        if not team_id:
-            squad = options.get("current_squad", [])
-        else:
-            url = f"{BASE_URL}/Results?gameweek={next_gw - 1}&teamId={team_id}"
+    if not cookies["LOIFF"]:
+        print("You must either put your LOIFF cookie in the .env file or supply `current_squad`, `initial_itb`, and `next_gw` in settings.json")
+        sys.exit(1)
+
+    if not settings_team_id:
+        print("You must supply a team_id in order for the solver to collect your live data")
+        sys.exit(1)
+        return
+
+    try:
+        with requests.Session() as s:
+            r = s.get(f"{BASE_URL}/Team/Transfers", cookies=cookies)
+            soup = BeautifulSoup(r.text, "html.parser")
+
+            if soup.find("title").text.startswith("Login"):
+                print("Request wasn't made with a valid LOIFF cookie - replace the current one in .env and try again")
+                sys.exit(1)
+
+            next_gw = int([x for x in soup.find_all("strong") if "GW" in x.text][-1].text.split(" ")[1])
+
+            balance = next(x.text for x in soup.find_all("label") if x.text.startswith("Balance"))
+            itb = int(10 * float(balance.split("€")[1].strip()))
+
+            url = f"{BASE_URL}/Results?gameweek={next_gw - 1}&teamId={settings_team_id}"
             r = s.get(url, cookies=cookies)
             soup = BeautifulSoup(r.text, "html.parser")
+
             player_cards = soup.find_all("div", {"data-target": "#playerScore"})
             squad = [int(player["onclick"].split(",")[0].replace("'", "").split("(")[1]) for player in player_cards]
+            assert len(squad) == 15, f"Expected to find 15 players in your squad, but found {len(squad)}"
+    except IndexError:
+        print("")
 
-        assert len(squad) == 15, f"Expected to find 15 players in your squad, but found {len(squad)}"
+    next_gw = settings_next_gw if settings_next_gw is not None else next_gw
+    squad = settings_squad if len(settings_squad) == 15 else squad
+    itb = 10 * settings_itb if settings_itb is not None else itb
 
+    print(next_gw, squad, itb)
     return next_gw, squad, itb
 
 
@@ -117,19 +143,10 @@ def solve(runtime_options=None):
         current_squad = []
         itb = 1000
     else:
-        next_gw = options.get("next_gw")
-        current_squad = options.get("current_squad", [])
-        itb = options.get("initial_itb", 0.0)
-
-        if len(current_squad) not in [0, 15]:
-            raise ValueError(f"The length of your current squad list must be either 0 or 15. It is currently {len(current_squad)}")
-
-        if not next_gw or not current_squad or not itb:
-            print("Fetching live data because one of 'next_gw', 'current_squad' or 'initial_itb' have not been provided.")
-            next_gw, current_squad, itb = get_live_data(options)
-            options["next_gw"] = next_gw
-            options["current_squad"] = current_squad
-            options["initial_itb"] = itb
+        next_gw, current_squad, itb = get_live_data(options)
+        options["next_gw"] = next_gw
+        options["current_squad"] = current_squad
+        options["initial_itb"] = itb
 
     target_gw = options.get("target_gw", next_gw)
     gws = list(range(next_gw, next_gw + horizon))
