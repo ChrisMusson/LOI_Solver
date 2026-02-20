@@ -18,7 +18,7 @@
     "gap": 0,
     "no_future_transfers": false,
     "ft_penalty": 0,
-    "position_constraints":  [
+    "position_constraints_EXAMPLE":  [
         {
             "teams": ["Galway"],
             "pos": "GD",
