@@ -34,7 +34,7 @@ def get_live_data(options):
 
     if settings_squad and settings_next_gw is not None and settings_itb is not None:
         assert len(settings_squad) == 15, f"Expected to find 15 players in your squad, but found {len(settings_squad)}"
-        return settings_next_gw, settings_squad, settings_itb
+        return settings_next_gw, settings_squad, settings_itb * 10
 
     if not cookies["LOIFF"]:
         print("You must either put your LOIFF cookie in the .env file or supply `current_squad`, `initial_itb`, and `next_gw` in settings.json")
