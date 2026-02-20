@@ -247,8 +247,15 @@ def solve(runtime_options=None):
         name="squad_t_rel",
     )
 
+    # every gameweek, add/subtract a set amount of budget to account for price changes
+    # this should generally be positive if you think that your team is set up well in owning players that are going to rise
+    # negative if you don't have many players that will rise
+    itb_change_per_gw = 10 * float(options.get("itb_change_per_gw") or 0)
+    itb_cum_add = {w: 0 if w <= next_gw else int((w - next_gw) * itb_change_per_gw + 1e-9) for w in gws}
+    itb_step_add = {w: itb_cum_add[w] - itb_cum_add.get(w - 1, 0) for w in gws}
+
     model.add_constraints(
-        (itb[w] == itb[w - 1] + sold_amount[w] - bought_amount[w] for w in gws),
+        (itb[w] == itb[w - 1] + sold_amount[w] - bought_amount[w] + itb_step_add[w] for w in gws),
         name="cont_budget",
     )
 
@@ -570,7 +577,10 @@ def solve(runtime_options=None):
                 summary_of_actions += "CHIP " + chip_decision + "\n"
                 move_summary["chip"].append(chip_decision + str(w))
             # summary_of_actions += f"ITB={itb[w - 1].get_value()}->{itb[w].get_value()}, NT={n_transfers[w].get_value()}\n"
-            summary_of_actions += f"ITB={itb[w - 1].get_value() / 10}->{itb[w].get_value() / 10} {chip_decision}\n"
+            if options.get("itb_change_per_gw"):
+                summary_of_actions += f"ITB = {itb[w - 1].get_value() / 10} + {itb_step_add[w] / 10} -> {itb[w].get_value() / 10} {chip_decision}\n"
+            else:
+                summary_of_actions += f"ITB = {itb[w - 1].get_value() / 10} -> {itb[w].get_value() / 10} {chip_decision}\n"
             for p in players:
                 if t_in[p, w].get_value() > 0.5:
                     summary_of_actions += f"Buy {p} - {df['Name'][p]}\n"
