@@ -161,7 +161,7 @@ def solve(runtime_options=None):
             df[f"{w}_Pts"] = df[f"{w}_Pts"] + noise
 
     players = df.index.to_list()
-    el_types = df["Pos"].unique().tolist()
+    el_types = ["G", "D", "M", "F"]
     teams = df["Team"].unique().tolist()
     player_values = (df["Value" if "Value" in df.columns else "BV"] * 10).to_dict()
 
