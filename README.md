@@ -55,7 +55,7 @@ If you have the cookie saved to a `.env` file, you can then solve for any given 
 
   ```json
   {
-    "teams": ["Drogheda"],
+    "teams": ["Drogheda", "Dundalk"],
     "pos": "GDMF",
     "gws": [7,8,9,10,11],
     "num": 1,
