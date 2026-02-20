@@ -9,7 +9,7 @@
     "team_id": null,
     "current_squad": [],
     "next_gw": null,
-    "initial_itb": 0.0,
+    "initial_itb": null,
     "itb_change_per_gw": 0.0,
     "locked": [],
     "banned": [],
